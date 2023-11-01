@@ -1,17 +1,36 @@
+Here is a README file with emojis and installation instructions:
 
-✅ 🗝 sublime text 4152 license key
+# 🗝 Sublime Text 4152 License Key Patcher 
 
-✅ On Windows 10 use HxD Editor to patch Sublime Text 4152
+## 💻 Installation
 
-✅ Click 'Search' -> 'Find' -> Hex-value Tab -> Fill with hex : 80 78 05 00 0F 94 C1
+✅ Download and install Sublime Text 4152 as usual through the setup executable file
 
-✅ Right click on highlighted hex value then click 'Fill selection..'
+✅ Replace the default sublime_text.exe file located in C:\Program Files\Sublime Text with the patched exe file from this repo
 
-✅ On 'Fill selection' window, fill in Hex-values : C6 40 05 01 48 85 C9 then click 'OK' 👌
+✅ Enjoy full featured Sublime Text for free! 🎉
 
-✅ Click 'File' -> 'Save as...'> 📂
+## 🪛 Patching Instructions 
 
-✅ 04-Unlimited-License 🆓
+✅ Open the default sublime_text.exe in HxD hex editor
+
+✅ Click 'Search' -> 'Find' -> Hex-value Tab  
+
+✅ Fill in the hex value: 80 78 05 00 0F 94 C1
+
+✅ Right click on highlighted hex value then click 'Fill selection'
+
+✅ Fill in Hex-values: C6 40 05 01 48 85 C9 
+
+✅ Click 'OK' 👌
+
+✅ Click 'File' -> 'Save as...' 
+
+✅ Save patched exe as: 04-Unlimited-License.exe 🆓
+
+✅ Replace original sublime_text.exe with patched exe
+
+✅ Enjoy! 🥳
 
 
 ![alt text](https://github.com/ChathurangaBW/sublime-text-4152-license-key/blob/main/269644178-dc6b73f7-626b-481e-bbfe-1612fb1735e0.png)
