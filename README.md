@@ -1,4 +1,3 @@
-Here is a README file with emojis and installation instructions:
 
 # 🗝 Sublime Text 4152 License Key Patcher 
 
