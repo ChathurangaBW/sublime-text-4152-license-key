@@ -1,0 +1,197 @@
+# Sublime Text Update and Internet Connection Blocker
+# Run in PowerShell ISE as Administrator
+
+Write-Host "Sublime Text Update & Internet Blocker" -ForegroundColor Cyan
+Write-Host "======================================" -ForegroundColor Cyan
+
+# Check Administrator privileges
+if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Host "ERROR: Run PowerShell ISE as Administrator!" -ForegroundColor Red
+    return
+}
+
+# Find Sublime Text installations
+$sublimePaths = @()
+$commonPaths = @(
+    "${env:ProgramFiles}\Sublime Text 3\sublime_text.exe",
+    "${env:ProgramFiles}\Sublime Text\sublime_text.exe",
+    "${env:ProgramFiles(x86)}\Sublime Text 3\sublime_text.exe",
+    "${env:ProgramFiles(x86)}\Sublime Text\sublime_text.exe"
+)
+
+foreach ($path in $commonPaths) {
+    if (Test-Path $path) {
+        $sublimePaths += $path
+        Write-Host "Found Sublime Text: $path" -ForegroundColor Green
+    }
+}
+
+if ($sublimePaths.Count -eq 0) {
+    Write-Host "WARNING: No Sublime Text installations found!" -ForegroundColor Yellow
+    Write-Host "The script will still configure settings for standard locations." -ForegroundColor Yellow
+}
+
+Write-Host "`nStarting Sublime Text blocking process..." -ForegroundColor Yellow
+
+# 1. Block Sublime Text via Windows Firewall
+Write-Host "`n1. Blocking Sublime Text internet access via Firewall..." -ForegroundColor Cyan
+foreach ($path in $sublimePaths) {
+    try {
+        # Block outbound connections
+        New-NetFirewallRule -DisplayName "Block Sublime Text Outbound" -Direction Outbound -Program $path -Action Block -ErrorAction SilentlyContinue
+        # Block inbound connections
+        New-NetFirewallRule -DisplayName "Block Sublime Text Inbound" -Direction Inbound -Program $path -Action Block -ErrorAction SilentlyContinue
+        Write-Host "✓ Firewall rules created for: $path" -ForegroundColor Green
+    } catch {
+        Write-Host "✗ Failed to create firewall rule for: $path" -ForegroundColor Red
+    }
+}
+
+# 2. Block Sublime Text domains in hosts file
+Write-Host "`n2. Blocking Sublime Text domains in hosts file..." -ForegroundColor Cyan
+$hostsPath = "$env:SystemRoot\System32\drivers\etc\hosts"
+$blockedDomains = @(
+    "127.0.0.1 sublimetext.com",
+    "127.0.0.1 www.sublimetext.com",
+    "127.0.0.1 download.sublimetext.com",
+    "127.0.0.1 sublimehq.com",
+    "127.0.0.1 www.sublimehq.com",
+    "127.0.0.1 packagecontrol.io",
+    "127.0.0.1 www.packagecontrol.io"
+)
+
+try {
+    # Backup hosts file
+    Copy-Item $hostsPath "$hostsPath.backup" -ErrorAction SilentlyContinue
+    
+    # Add blocked domains
+    foreach ($domain in $blockedDomains) {
+        Add-Content -Path $hostsPath -Value $domain
+    }
+    Write-Host "✓ Blocked Sublime Text domains in hosts file" -ForegroundColor Green
+    Write-Host "✓ Hosts file backed up to: $hostsPath.backup" -ForegroundColor Green
+} catch {
+    Write-Host "✗ Failed to modify hosts file" -ForegroundColor Red
+}
+
+# 3. Disable updates in Sublime Text settings
+Write-Host "`n3. Disabling updates in Sublime Text settings..." -ForegroundColor Cyan
+$settingsPaths = @(
+    "$env:APPDATA\Sublime Text 3\Packages\User\Preferences.sublime-settings",
+    "$env:APPDATA\Sublime Text\Packages\User\Preferences.sublime-settings"
+)
+
+$updateSettings = @{
+    "update_check" = $false
+    "install_missing_packages" = $false
+    "auto_upgrade" = $false
+    "auto_upgrade_frequency" = 0
+}
+
+foreach ($settingsPath in $settingsPaths) {
+    $settingsDir = Split-Path $settingsPath
+    if (Test-Path $settingsDir) {
+        try {
+            if (Test-Path $settingsPath) {
+                # Read existing settings
+                $content = Get-Content $settingsPath -Raw
+                $settings = $content | ConvertFrom-Json
+                
+                # Update settings
+                foreach ($key in $updateSettings.Keys) {
+                    $settings | Add-Member -NotePropertyName $key -NotePropertyValue $updateSettings[$key] -Force
+                }
+                
+                # Save updated settings
+                $settings | ConvertTo-Json -Depth 10 | Set-Content $settingsPath
+            } else {
+                # Create new settings file
+                $updateSettings | ConvertTo-Json -Depth 10 | Set-Content $settingsPath
+            }
+            Write-Host "✓ Updated settings: $settingsPath" -ForegroundColor Green
+        } catch {
+            Write-Host "✗ Failed to update: $settingsPath" -ForegroundColor Red
+        }
+    }
+}
+
+# 4. Block Package Control (if installed)
+Write-Host "`n4. Blocking Package Control updates..." -ForegroundColor Cyan
+$packageControlPaths = @(
+    "$env:APPDATA\Sublime Text 3\Packages\Package Control\Package Control.sublime-settings",
+    "$env:APPDATA\Sublime Text\Packages\Package Control\Package Control.sublime-settings"
+)
+
+$packageControlSettings = @{
+    "auto_upgrade" = $false
+    "auto_upgrade_frequency" = 0
+    "install_missing_packages" = $false
+}
+
+foreach ($pcPath in $packageControlPaths) {
+    if (Test-Path $pcPath) {
+        try {
+            $packageControlSettings | ConvertTo-Json -Depth 10 | Set-Content $pcPath
+            Write-Host "✓ Disabled Package Control updates: $pcPath" -ForegroundColor Green
+        } catch {
+            Write-Host "✗ Failed to update Package Control settings" -ForegroundColor Red
+        }
+    }
+}
+
+# 5. Create a batch file to kill Sublime Text network processes
+Write-Host "`n5. Creating network process killer..." -ForegroundColor Cyan
+$batchContent = @"
+@echo off
+echo Killing Sublime Text network processes...
+taskkill /f /im sublime_text.exe 2>nul
+netsh advfirewall firewall set rule name="Block Sublime Text Outbound" new enable=yes
+netsh advfirewall firewall set rule name="Block Sublime Text Inbound" new enable=yes
+echo Sublime Text network access blocked!
+pause
+"@
+
+$batchPath = "$env:USERPROFILE\Desktop\Block_Sublime_Network.bat"
+try {
+    Set-Content -Path $batchPath -Value $batchContent
+    Write-Host "✓ Created network blocker batch file: $batchPath" -ForegroundColor Green
+} catch {
+    Write-Host "✗ Failed to create batch file" -ForegroundColor Red
+}
+
+# Summary
+Write-Host "`n" + "="*50 -ForegroundColor Cyan
+Write-Host "SUBLIME TEXT BLOCKING COMPLETE!" -ForegroundColor Green
+Write-Host "="*50 -ForegroundColor Cyan
+
+Write-Host "`nActions performed:" -ForegroundColor White
+Write-Host "✓ Firewall rules created to block all internet access" -ForegroundColor Green
+Write-Host "✓ Sublime Text domains blocked in hosts file" -ForegroundColor Green
+Write-Host "✓ Update checks disabled in Sublime Text settings" -ForegroundColor Green
+Write-Host "✓ Package Control updates disabled" -ForegroundColor Green
+Write-Host "✓ Network process killer created on Desktop" -ForegroundColor Green
+
+Write-Host "`nTo restore normal functionality, run:" -ForegroundColor Yellow
+Write-Host "Restore-SublimeTextAccess" -ForegroundColor Gray
+
+# Create restore function
+function Restore-SublimeTextAccess {
+    Write-Host "Restoring Sublime Text internet access..." -ForegroundColor Yellow
+    
+    # Remove firewall rules
+    Get-NetFirewallRule | Where-Object {$_.DisplayName -like "*Sublime*"} | Remove-NetFirewallRule -ErrorAction SilentlyContinue
+    
+    # Restore hosts file
+    if (Test-Path "$hostsPath.backup") {
+        Copy-Item "$hostsPath.backup" $hostsPath -Force
+    }
+    
+    # Remove batch file
+    if (Test-Path $batchPath) {
+        Remove-Item $batchPath -Force
+    }
+    
+    Write-Host "✓ Sublime Text access restored!" -ForegroundColor Green
+}
+
+Write-Host "`nSublime Text is now completely blocked from internet access and updates!" -ForegroundColor Green
